@@ -1,132 +1,134 @@
-# E-mail-Driven Review Agents (case study)
+# Agentes de Revisão Acionados por E-mail (estudo de caso)
 
-A desktop automation layer that watches a shared Outlook mailbox, saves incoming reports and spreadsheets, and dispatches three agents: one publishes vessel positions to a public map, one reviews technical monitoring spreadsheets with a deterministic rules engine plus an LLM "second opinion", and one publishes partner datasets to a client portal. A drafter turns review findings into an Outlook draft; nothing is ever sent automatically.
+**Português** · [English](README.en.md)
 
-Built during my work at Toveri, an environmental consultancy that monitors offshore operations. Documentation only: no source code, client names, data or infrastructure identifiers.
+Uma camada de automação de desktop que monitora uma caixa compartilhada do Outlook, salva os relatórios e planilhas que chegam e aciona três agentes: um publica posições de navios em um mapa público, outro revisa planilhas técnicas de monitoramento com um motor de regras determinístico mais uma "segunda opinião" de LLM, e o terceiro publica conjuntos de dados de parceiros em um portal do cliente. Um redator transforma os achados da revisão em um rascunho no Outlook; nada é enviado automaticamente.
 
-> This repository is documentation only. The source code, data and infrastructure belong to the employer and are not published here. See [What is intentionally omitted](#what-is-intentionally-omitted).
+Desenvolvido durante meu trabalho na Toveri, uma consultoria ambiental que monitora operações offshore. Apenas documentação: sem código-fonte, nomes de clientes, dados ou identificadores de infraestrutura.
 
-## Problem
+> Este repositório contém apenas documentação. O código-fonte, os dados e a infraestrutura pertencem ao empregador e não estão publicados aqui. Veja [O que foi omitido intencionalmente](#o-que-foi-omitido-intencionalmente).
 
-An environmental consultancy that monitors offshore seismic surveys receives, at any hour, e-mails from vessels and partners: daily position reports, record spreadsheets from the marine fauna and passive acoustic monitoring teams, operation and effort logs, review-control sheets and partner datasets.
+## Problema
 
-Each item has to be saved, checked and acted on. Reviewing a monitoring record is meticulous work: timestamps against the operations log, mitigation interruption calculations, source states, and consistency between the narrative text and the data, against written instructions and precedent set by senior reviewers. Doing this by hand meant the first hours of each day went to triage before any judgement was applied.
+Uma consultoria ambiental que monitora pesquisas sísmicas offshore recebe, a qualquer hora, e-mails de navios e parceiros: reportes diários de posição, planilhas de registros das equipes de monitoramento de fauna marinha e de monitoramento acústico passivo, logs de operação e de esforço, planilhas de controle de revisão e conjuntos de dados de parceiros.
 
-The goal: turn the computer on and find the work already saved, checked, and summarised, with every outgoing message waiting as a draft for a human to approve.
+Cada item precisa ser salvo, verificado e tratado. Revisar um registro de monitoramento é um trabalho minucioso: horários contra o log de operações, cálculos de interrupção para mitigação, estados da fonte e coerência entre o texto narrativo e os dados, à luz de instruções escritas e de precedentes definidos por revisores seniores. Feito manualmente, isso consumia as primeiras horas de cada dia em triagem antes de qualquer análise técnica.
 
-## My role
+Objetivo: material recebido salvo, verificado e resumido sem triagem manual, com toda mensagem de saída retida como rascunho até aprovação humana.
 
-Sole developer and the primary user: I review these spreadsheets as part of the environmental team, and I designed, built and operate the automation. I used AI-assisted development (Claude Code) throughout; design decisions, review and responsibility for results are mine.
+## Meu papel
 
-## Architecture
+Desenvolvedor único e principal usuário: reviso essas planilhas como parte da equipe ambiental, e projetei, construí e opero a automação. Usei desenvolvimento assistido por IA (Claude Code) durante todo o projeto; as decisões de design, a revisão e a responsabilidade pelos resultados são minhas.
+
+## Arquitetura
 
 ```mermaid
 flowchart LR
-  OL[Shared Outlook mailbox] -->|COM, every 5 min| W[Watcher<br/>PowerShell]
-  W --> Q{Attachment type}
-  Q -->|position report| H[Position agent]
-  Q -->|monitoring spreadsheets| RV[Review agent]
-  Q -->|partner dataset| DS[Dataset agent]
-  H --> MAP[Public map]
-  RV --> RE[Rules engine<br/>+ LLM reviewer]
-  RE --> DR[Drafter]
-  DR --> DRAFT[Outlook draft<br/>never sent]
-  DS --> PT[Client portal]
-  H --> N[Desktop notification]
+  OL[Caixa compartilhada do Outlook] -->|COM, a cada 5 min| W[Watcher<br/>PowerShell]
+  W --> Q{Tipo de anexo}
+  Q -->|reporte de posição| H[Agente de posição]
+  Q -->|planilhas de monitoramento| RV[Agente de revisão]
+  Q -->|dataset de parceiro| DS[Agente de datasets]
+  H --> MAP[Mapa público]
+  RV --> RE[Motor de regras<br/>+ revisor LLM]
+  RE --> DR[Redator]
+  DR --> DRAFT[Rascunho no Outlook<br/>nunca enviado]
+  DS --> PT[Portal do cliente]
+  H --> N[Notificação no desktop]
   RV --> N
   DS --> N
 ```
 
 ### Watcher
 
-- A PowerShell script run by Windows Task Scheduler every five minutes, hidden. It reads Outlook through COM and never modifies or moves e-mail.
-- Deduplicates by Outlook `EntryID` (and by subject plus received time for position reports), keeping a bounded set of the last 3,000 seen items in a state file; it only processes mail received after it was first started.
-- One run at a time: a run still alive after four minutes is treated as stuck and terminated; a recent one causes the new run to exit.
-- If Outlook is closed (for example right after boot), it starts Outlook minimised and exits; the next run finds the mailbox synchronised.
-- Saves matching attachments into per-message folders and dispatches agents as separate hidden processes, so a review that takes minutes never blocks the watcher.
+- Um script PowerShell executado pelo Agendador de Tarefas do Windows a cada cinco minutos, oculto. Ele lê o Outlook via COM e nunca altera nem move e-mails.
+- Deduplica pelo `EntryID` do Outlook (e por assunto mais horário de recebimento, no caso dos reportes de posição), mantendo um conjunto limitado aos últimos 3.000 itens vistos em um arquivo de estado; só processa e-mails recebidos depois que foi iniciado pela primeira vez.
+- Uma execução por vez: uma execução ainda ativa após quatro minutos é considerada travada e encerrada; uma execução recente faz a nova sair.
+- Se o Outlook estiver fechado (por exemplo, logo depois de ligar a máquina), ele abre o Outlook minimizado e sai; a próxima execução encontra a caixa sincronizada.
+- Salva os anexos correspondentes em pastas por mensagem e aciona os agentes como processos ocultos separados, de modo que uma revisão que leva minutos nunca bloqueia o watcher.
 
-### Agent runner
+### Executor de agentes
 
-- One instance per agent type, enforced by a lock file with a 40-minute staleness limit.
-- If new material arrives while the review agent is running, the runner records a "repeat when done" flag instead of starting a second instance (up to three passes).
-- The position agent drains a file queue in name order, so reports are processed chronologically.
-- Each agent prints a JSON result (`status`, title, message, link). The runner turns it into a Windows notification under its own registered app identity, with a click-through to the result; quiet outcomes (no change, ignored) produce no notification, and any exception produces an error notification.
+- Uma instância por tipo de agente, garantida por um arquivo de lock com limite de validade de 40 minutos.
+- Se chegar material novo enquanto o agente de revisão está rodando, o executor registra um flag de "repetir ao terminar" em vez de iniciar uma segunda instância (até três passadas).
+- O agente de posição esvazia uma fila de arquivos em ordem de nome, então os reportes são processados em ordem cronológica.
+- Cada agente imprime um resultado em JSON (`status`, título, mensagem, link). O executor transforma isso em uma notificação do Windows com identidade de app própria registrada, com clique para abrir o resultado; desfechos silenciosos (sem mudança, ignorado) não geram notificação, e qualquer exceção gera uma notificação de erro.
 
-### Position agent
+### Agente de posição
 
-The desktop predecessor of the cloud pipeline described in the maritime operations map case study: parse the report, apply deterministic checks (newer than published, regional bounding box, implied speed), ask Claude for a plausibility opinion, and publish the last reported position as a file on the map's App Service through the Kudu VFS API. Authentication uses a short-lived token from the signed-in Azure CLI, so no credential is stored in the code or on disk by the agent.
+O antecessor de desktop do pipeline na nuvem descrito no estudo de caso do mapa de operações marítimas: interpreta o reporte, aplica verificações determinísticas (mais recente que o publicado, bounding box regional, velocidade implícita), pede ao Claude uma opinião de plausibilidade e publica a última posição reportada como um arquivo no App Service do mapa, por meio da API VFS do Kudu. A autenticação usa um token de curta duração do Azure CLI já logado, então o agente não armazena nenhuma credencial no código nem em disco.
 
-### Review agent and expert reviewer
+### Agente de revisão e revisor especialista
 
-The review agent finds saved messages from the last two days that contain a monitoring record spreadsheet and a review-control sheet, pairs them with the most recent operations log, hashes the inputs (SHA-256 over file names and bytes) to skip anything already reviewed, and runs the expert reviewer. It is read-only.
+O agente de revisão encontra mensagens salvas nos últimos dois dias que contenham uma planilha de registros de monitoramento e uma planilha de controle de revisão, junta-as ao log de operações mais recente, calcula um hash das entradas (SHA-256 sobre nomes e bytes dos arquivos) para pular o que já foi revisado e executa o revisor especialista. Ele é somente leitura.
 
-The expert reviewer has two layers:
+O revisor especialista tem duas camadas:
 
-1. **Rules engine (deterministic, about 4,100 lines of Python).** Reads the record spreadsheets (openpyxl; oletools for macro-enabled workbooks) and checks them against the operations log and the written instructions: timestamps, interruption calculations, source states, concurrency of events, and whether corrections requested in a previous review round were applied.
-2. **LLM reviewer.** A per-record dossier (record data, rule findings, relevant log rows, instruction excerpts, approved precedents) goes to Claude with a system prompt describing the role and method of an experienced marine biologist reviewer. The model must confirm or discard each rule finding with a reason and a source, may add technical or biological observations, and classifies every item as **Error** (objective divergence from the log, the sheet itself or an explicit rule), **Human validation** (a grounded doubt, phrased as a question) or **Suggestion** (clarity only, never sent to the operator).
+1. **Motor de regras (determinístico, cerca de 4.100 linhas de Python).** Lê as planilhas de registros (openpyxl; oletools para pastas de trabalho com macros) e as confere contra o log de operações e as instruções escritas: horários, cálculos de interrupção, estados da fonte, simultaneidade de eventos e se as correções pedidas em uma rodada de revisão anterior foram aplicadas.
+2. **Revisor LLM.** Um dossiê por registro (dados do registro, achados das regras, linhas relevantes do log, trechos das instruções, precedentes aprovados) vai para o Claude com um system prompt que descreve o papel e o método de um biólogo marinho revisor experiente. O modelo precisa confirmar ou descartar cada achado das regras com uma justificativa e uma fonte, pode acrescentar observações técnicas ou biológicas e classifica cada item como **Erro** (divergência objetiva em relação ao log, à própria planilha ou a uma regra explícita), **Validação humana** (uma dúvida fundamentada, formulada como pergunta) ou **Sugestão** (apenas clareza, nunca enviada ao operador).
 
-Details that matter:
+Detalhes de implementação:
 
-- **Two access paths, one fallback.** An API key if configured; otherwise the locally signed-in Claude Code CLI in headless mode (`-p`, no tools, JSON schema for the output, run from an empty temporary directory, no session persistence). With neither, the reviewer runs on rules alone and says so.
-- **Rules survive model failure.** Any exception in the LLM layer is recorded and the rule findings are still reported.
-- **Output normalisation.** The model's JSON is normalised against small naming variations, and a record the model marks "approve" is escalated to "request revision" if it contains any Error item.
-- **Originals are never opened.** Inputs are copied to a temporary directory before parsing.
-- **Feedback loop.** When a senior reviewer disagrees with a finding, the disagreement is stored in a shared folder and the written criteria files are updated, so the next run applies the corrected practice.
-- **Interfaces.** A local web app (Python `ThreadingHTTPServer` bound to `127.0.0.1`) with an HTML report and history, a command-line entry point, a Claude Code skill, and a PyInstaller installer for colleagues.
+- **Dois caminhos de acesso, um fallback.** Uma chave de API, se configurada; caso contrário, o Claude Code CLI logado localmente em modo headless (`-p`, sem ferramentas, schema JSON para a saída, executado a partir de um diretório temporário vazio, sem persistência de sessão). Sem nenhum dos dois, o revisor roda apenas com as regras e informa isso.
+- **As regras sobrevivem à falha do modelo.** Qualquer exceção na camada de LLM é registrada, e os achados das regras continuam sendo reportados.
+- **Normalização da saída.** O JSON do modelo é normalizado contra pequenas variações de nomenclatura, e um registro que o modelo marca como "approve" é elevado para "request revision" se contiver qualquer item de Erro.
+- **Os originais nunca são abertos.** As entradas são copiadas para um diretório temporário antes da leitura.
+- **Ciclo de feedback.** Quando um revisor sênior discorda de um achado, a discordância é armazenada em uma pasta compartilhada e os arquivos de critérios escritos são atualizados, para que a próxima execução aplique a prática corrigida.
+- **Interfaces.** Um app web local (`ThreadingHTTPServer` do Python vinculado a `127.0.0.1`) com relatório em HTML e histórico, um ponto de entrada por linha de comando, uma skill do Claude Code e um instalador PyInstaller para colegas.
 
-### Drafter
+### Redator
 
-Turns a batch of review reports into the reply a human sends:
+Transforma um lote de relatórios de revisão na resposta que uma pessoa envia:
 
-- asks the model to re-verify every point and keep it only if it is supported by the data, not redundant with something the human reviewer already wrote, not contradicted by an approved precedent, and not speculative ("when in doubt, discard and explain why");
-- writes comments and statuses into a copy of the review-control sheet through Excel COM, keeping the original untouched;
-- creates an Outlook draft with the attachments and a short body, and saves the per-item justifications next to the sheet.
+- pede ao modelo que verifique novamente cada ponto e só o mantenha se for sustentado pelos dados, não for redundante com algo que o revisor humano já escreveu, não for contradito por um precedente aprovado e não for especulativo ("na dúvida, descarte e explique por quê");
+- escreve comentários e status em uma cópia da planilha de controle de revisão via Excel COM, mantendo o original intacto;
+- cria um rascunho no Outlook com os anexos e um corpo curto, e salva as justificativas de cada item ao lado da planilha.
 
-The Outlook item is created and saved as a draft. There is no send call in the code; a person reads, edits and sends.
+O item do Outlook é criado e salvo como rascunho. Não há chamada de envio no código; uma pessoa lê, edita e envia.
 
-### Dataset agent
+### Agente de datasets
 
-Loads a partner's monitoring spreadsheets into the client portal through the portal's own loader, after validation, and reports one of: published, no change, held (validation failed, nothing published), or error.
+Carrega as planilhas de monitoramento de um parceiro no portal do cliente por meio do próprio carregador do portal, após validação, e reporta um destes resultados: publicado, sem mudança, retido (a validação falhou, nada foi publicado) ou erro.
 
-## Key engineering decisions
+## Principais decisões de engenharia
 
-- **Deterministic rules first, LLM as second opinion, human approves.** The rules are fast, explainable and testable; the model adds judgement the rules cannot encode and must justify every item with a source. A human signs off on anything that leaves the building.
-- **Agents draft, they do not send.** Removes the highest-impact failure mode (a wrong message to a client or regulator) by construction rather than by configuration.
-- **Read-only by default.** The watcher never changes e-mail; the reviewer works on copies; only the drafter writes, and only to a copy.
-- **Idempotency everywhere.** EntryID sets, input hashes and "newer than published" checks mean a re-run or a re-delivered e-mail causes no duplicate work or publication.
-- **No stored cloud secrets in the agents.** Publishing uses tokens from the signed-in Azure CLI; LLM access uses either a locally configured key or the signed-in CLI.
-- **Small, observable processes.** Each agent is a separate process with a JSON result, a log line and a notification, which makes failures visible on the desktop instead of buried in a log.
+- **Regras determinísticas primeiro, LLM como segunda opinião, aprovação humana no final.** As regras são rápidas, explicáveis e testáveis; o modelo acrescenta um julgamento que as regras não conseguem codificar e precisa justificar cada item com uma fonte. Toda mensagem de saída exige aprovação humana (human-in-the-loop).
+- **Os agentes redigem, não enviam.** Isso elimina o modo de falha de maior impacto (uma mensagem errada para um cliente ou para o órgão regulador) por construção, e não por configuração.
+- **Somente leitura por padrão.** O watcher nunca altera e-mails; o revisor trabalha sobre cópias; só o redator escreve, e apenas em uma cópia.
+- **Idempotência em todo lugar.** Conjuntos de EntryID, hashes das entradas e verificações de "mais recente que o publicado" fazem com que uma reexecução ou um e-mail reentregue não gere trabalho nem publicação duplicados.
+- **Nenhum segredo de nuvem armazenado nos agentes.** A publicação usa tokens do Azure CLI logado; o acesso ao LLM usa uma chave configurada localmente ou o CLI logado.
+- **Processos pequenos e observáveis.** Cada agente é um processo separado com um resultado em JSON, uma linha de log e uma notificação, o que deixa as falhas visíveis no desktop em vez de enterradas em um log.
 
 ## Stack
 
-- PowerShell 5.1, Windows Task Scheduler, Outlook and Excel COM automation, Windows toast notifications
-- Python (standard library, openpyxl, oletools, pypdf)
-- Claude via the Anthropic API or the Claude Code CLI in headless mode
-- Azure CLI (access tokens), Kudu VFS API
-- PyInstaller (installer for the reviewer)
+- PowerShell 5.1, Agendador de Tarefas do Windows, automação COM do Outlook e do Excel, notificações toast do Windows
+- Python (biblioteca padrão, openpyxl, oletools, pypdf)
+- Claude via API da Anthropic ou via Claude Code CLI em modo headless
+- Azure CLI (tokens de acesso), API VFS do Kudu
+- PyInstaller (instalador do revisor)
 
-## Testing and quality
+## Testes e qualidade
 
-- **No automated tests** for the watcher, the agents, the expert reviewer or the drafter. Verification so far is manual: running against real batches and comparing with human review.
-- One recorded validation (4 Nov 2026): on a batch of marine fauna records, the LLM layer flagged the same two issues as the manual review, neither of which the rules engine detected on its own. On a passive acoustic batch it confirmed the corrections requested in the previous round and raised three questions for a human. This is one batch, not a benchmark.
-- The rules engine descends from two earlier standalone deterministic reviewers, which do have pytest suites (36 and 80 tests). Those tests were not carried over into the combined reviewer.
+- **Nenhum teste automatizado** para o watcher, os agentes, o revisor especialista ou o redator. Até aqui, a verificação é manual: execução sobre lotes reais e comparação com a revisão humana.
+- Uma validação registrada (4 nov 2026): em um lote de registros de fauna marinha, a camada de LLM apontou os mesmos dois problemas que a revisão manual, nenhum dos quais o motor de regras detectou sozinho. Em um lote de acústica passiva, ela confirmou as correções pedidas na rodada anterior e levantou três perguntas para uma pessoa. É um único lote, não um benchmark.
+- O motor de regras descende de dois revisores determinísticos independentes anteriores, que têm suítes pytest (36 e 80 testes). Esses testes não foram trazidos para o revisor combinado.
 
 ## Status
 
-In daily use on my workstation since November 2026 (the watcher's log starts on 9 Nov 2026). The position agent now runs in parallel with the cloud ingest pipeline, which superseded it; both are idempotent. The drafter is a separate step run on the reviewer's reports rather than chained automatically after every review.
+Em uso diário na minha estação de trabalho desde novembro de 2026 (o log do watcher começa em 9 nov 2026). O agente de posição agora roda em paralelo com o pipeline de ingestão na nuvem, que o substituiu; ambos são idempotentes. O redator é uma etapa separada, executada sobre os relatórios do revisor, e não encadeada automaticamente após cada revisão.
 
-## What is intentionally omitted
+## O que foi omitido intencionalmente
 
-- **Source code, prompts and criteria files.** Employer property; the criteria encode practice agreed with senior reviewers and the client's written instructions.
-- **Mailbox names, sender addresses, client and partner names, vessel data.** Confidential.
-- **Example spreadsheets and reports.** They are real regulatory records.
+- **Código-fonte, prompts e arquivos de critérios.** Propriedade do empregador; os critérios codificam a prática acordada com revisores seniores e as instruções escritas do cliente.
+- **Nomes de caixas de e-mail, endereços de remetentes, nomes de clientes e parceiros, dados de navios.** Confidenciais.
+- **Planilhas e relatórios de exemplo.** São registros regulatórios reais.
 
-## Lessons and next steps
+## Lições e próximos passos
 
-- **Tests first for the combined rules engine.** Port the predecessors' pytest suites and add golden-file tests built from anonymized records, so rule changes cannot regress silently.
-- **Version control.** Part of this code has no repository yet, and the published copy of the reviewer is behind the local one. One repository with the watcher, agents and reviewer is the next step.
-- **Single owner per job.** Retire the desktop position agent now that the cloud pipeline exists.
-- **Less dependence on one workstation.** The watcher needs a signed-in desktop with Outlook running. A mailbox-triggered cloud flow (as already done for position reports) is the direction for the other agents where data rules allow it.
-- **Measure, then claim.** Keep a log of reviewer agreement and disagreement per batch, so statements about the LLM layer's usefulness rest on more than one validation run.
+- **Testes primeiro para o motor de regras combinado.** Portar as suítes pytest dos antecessores e adicionar testes golden-file construídos a partir de registros anonimizados, para que mudanças nas regras não causem regressões silenciosas.
+- **Controle de versão.** Parte deste código ainda não tem repositório, e a cópia publicada do revisor está defasada em relação à local. Um único repositório com o watcher, os agentes e o revisor é o próximo passo.
+- **Um único responsável por tarefa.** Aposentar o agente de posição de desktop agora que o pipeline na nuvem existe.
+- **Menos dependência de uma estação de trabalho.** O watcher precisa de um desktop logado com o Outlook aberto. Um fluxo na nuvem acionado pela caixa de e-mail (como já foi feito para os reportes de posição) é o caminho para os outros agentes, onde as regras sobre os dados permitirem.
+- **Medir antes de afirmar.** Manter um registro de concordância e discordância do revisor por lote, para que as afirmações sobre a utilidade da camada de LLM se apoiem em mais de uma rodada de validação.
 
-More detail on specific decisions: [docs/decisions.md](docs/decisions.md).
+Mais detalhes sobre decisões específicas: [docs/decisoes.md](docs/decisoes.md).

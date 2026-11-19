@@ -1,5 +1,7 @@
 # Decisions (ADR-style)
 
+[Português](decisoes.md) · **English**
+
 Short records of decisions that shaped the agents. Each one is grounded in the working code; the code itself is not published.
 
 ## 1. Rules engine first, LLM as a second opinion
