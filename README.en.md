@@ -4,7 +4,7 @@
 
 A desktop automation layer that watches a shared Outlook mailbox, saves incoming reports and spreadsheets, and dispatches three agents: one publishes vessel positions to a public map, one reviews technical monitoring spreadsheets with a deterministic rules engine plus an LLM "second opinion", and one publishes partner datasets to a client portal. A drafter turns review findings into an Outlook draft; nothing is ever sent automatically.
 
-Built during my work at Toveri, an environmental consultancy that monitors offshore operations. Documentation only: no source code, client names, data or infrastructure identifiers.
+Built during my work at [Toveri](https://toveri.com.br), an environmental consultancy that monitors offshore operations. Documentation only: no source code, client names, data or infrastructure identifiers.
 
 > This repository is documentation only. The source code, data and infrastructure belong to the employer and are not published here. See [What is intentionally omitted](#what-is-intentionally-omitted).
 

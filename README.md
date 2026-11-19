@@ -4,7 +4,7 @@
 
 Uma camada de automação de desktop que monitora uma caixa compartilhada do Outlook, salva os relatórios e planilhas que chegam e aciona três agentes: um publica posições de navios em um mapa público, outro revisa planilhas técnicas de monitoramento com um motor de regras determinístico mais uma "segunda opinião" de LLM, e o terceiro publica conjuntos de dados de parceiros em um portal do cliente. Um redator transforma os achados da revisão em um rascunho no Outlook; nada é enviado automaticamente.
 
-Desenvolvido durante meu trabalho na Toveri, uma consultoria ambiental que monitora operações offshore. Apenas documentação: sem código-fonte, nomes de clientes, dados ou identificadores de infraestrutura.
+Desenvolvido durante meu trabalho na [Toveri](https://toveri.com.br), uma consultoria ambiental que monitora operações offshore. Apenas documentação: sem código-fonte, nomes de clientes, dados ou identificadores de infraestrutura.
 
 > Este repositório contém apenas documentação. O código-fonte, os dados e a infraestrutura pertencem ao empregador e não estão publicados aqui. Veja [O que foi omitido intencionalmente](#o-que-foi-omitido-intencionalmente).
 
