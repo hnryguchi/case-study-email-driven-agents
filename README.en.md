@@ -18,7 +18,7 @@ Goal: incoming material saved, checked and summarised without manual triage, wit
 
 ## My role
 
-Sole developer and the primary user: I review these spreadsheets as part of the environmental team, and I designed, built and operate the automation. I used AI-assisted development (Claude Code) throughout; design decisions, review and responsibility for results are mine.
+Sole developer and the primary user: I review these spreadsheets as an Environmental Trainee, and I designed, built and operate the automation. I used AI-assisted development (Claude Code) throughout; design decisions, review and responsibility for results are mine.
 
 ## Architecture
 

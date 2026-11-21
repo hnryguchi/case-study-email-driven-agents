@@ -18,7 +18,7 @@ Objetivo: material recebido salvo, verificado e resumido sem triagem manual, com
 
 ## Meu papel
 
-Desenvolvedor único e principal usuário: reviso essas planilhas como parte da equipe ambiental, e projetei, construí e opero a automação. Usei desenvolvimento assistido por IA (Claude Code) durante todo o projeto; as decisões de design, a revisão e a responsabilidade pelos resultados são minhas.
+Desenvolvedor único e principal usuário: reviso essas planilhas como trainee ambiental, e projetei, construí e opero a automação. Usei desenvolvimento assistido por IA (Claude Code) durante todo o projeto; as decisões de design, a revisão e a responsabilidade pelos resultados são minhas.
 
 ## Arquitetura
 
