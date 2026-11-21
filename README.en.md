@@ -132,3 +132,7 @@ In daily use on my workstation since November 2026 (the watcher's log starts on 
 - **Measure before claiming.** Keep a log of reviewer agreement and disagreement per batch, so statements about the LLM layer's usefulness rest on more than one validation run.
 
 More detail on specific decisions: [docs/decisions.md](docs/decisions.md).
+
+---
+
+> © Henry Noguchi. **All rights reserved.** Public for viewing only; copying, reuse or presenting it as your own requires permission. See [LICENSE](LICENSE).

@@ -132,3 +132,7 @@ Em uso diário na minha estação de trabalho desde novembro de 2026 (o log do w
 - **Medir antes de afirmar.** Manter um registro de concordância e discordância do revisor por lote, para que as afirmações sobre a utilidade da camada de LLM se apoiem em mais de uma rodada de validação.
 
 Mais detalhes sobre decisões específicas: [docs/decisoes.md](docs/decisoes.md).
+
+---
+
+> © Henry Noguchi. **Todos os direitos reservados.** Repositório público só para leitura; copiar, reutilizar ou apresentar como próprio exige autorização. Ver [LICENSE](LICENSE).
